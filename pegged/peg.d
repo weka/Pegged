@@ -1664,9 +1664,32 @@ template or(rules...) if (rules.length > 0)
         size_t errorStringChars;
         string orErrorString;
 
-        ParseTree[] results = new ParseTree[rules.length];
-        string[] names = new string[rules.length];
-        size_t[] failedLength = new size_t[rules.length];
+        ParseTree[] _results = null;
+        string[] _errorNames = null;
+        size_t[] _failedLength = null;
+
+        ParseTree getResult(size_t ruleIdx) { return ruleIdx < _results.length ? _results[ruleIdx] : ParseTree.init; }
+        void setResult(size_t ruleIdx, ref ParseTree result) {
+            if (result == ParseTree.init) return;
+
+            _results.length = max(_results.length, ruleIdx + 1);
+            _results[ruleIdx] = result;
+        }
+
+        string getErrorName(size_t ruleIdx) { return ruleIdx < _errorNames.length ? _errorNames[ruleIdx] : null; }
+        void setErrorName(size_t ruleIdx, string errorName) {
+            if (errorName is null) return;
+
+            _errorNames.length = max(_errorNames.length, ruleIdx + 1);
+            _errorNames[ruleIdx] = errorName;
+        }
+
+        size_t getFailedLength(size_t ruleIdx) { return ruleIdx < _failedLength.length ? _failedLength[ruleIdx] : size_t.init; }
+        void setFailedLength(size_t ruleIdx, size_t len) {
+            _failedLength.length = max(_failedLength.length, ruleIdx + 1);
+            _failedLength[ruleIdx] = len;
+        }
+
         size_t maxFailedLength;
 
         version (tracer)
@@ -1708,7 +1731,7 @@ template or(rules...) if (rules.length > 0)
                         trace(traceResultMsg(temp, getName!(r)()));
                 }
                 enum errName = " (" ~ getName!(r)() ~")";
-                failedLength[i] = temp.end;
+                setFailedLength(i, temp.end);
                 if (temp.end >= longestFail.end)
                 {
                     if (temp.end == longestFail.end)
@@ -1717,8 +1740,8 @@ template or(rules...) if (rules.length > 0)
                         errorStringChars = (temp.matches.length > 0 ? temp.matches[$-1].length : 0) + errName.length + 4;
                     maxFailedLength = temp.end;
                     longestFail = temp;
-                    names[i] = errName;
-                    results[i] = temp;
+                    setErrorName(i, errName);
+                    setResult(i, temp);
 
                 }
                 // Else, this error parsed less input than another one: we discard it.
@@ -1737,14 +1760,15 @@ template or(rules...) if (rules.length > 0)
         string errString;
         errString.reserve(errorStringChars);
         foreach(i; 0..rules.length)
-            if (failedLength[i] == maxFailedLength && results[i].matches.length > 0)
-                errString ~= results[i].matches[$-1] ~ names[i] ~ " or ";
+            if (getFailedLength(i) == maxFailedLength && getResult(i).matches.length > 0)
+                errString ~= getResult(i).matches[$-1] ~ getErrorName(i) ~ " or ";
         orErrorString = errString[0 .. $ >= 4 ? $-4 : $];
 
         longestFail.matches = longestFail.matches.length == 0 ? [orErrorString] :
                               longestFail.matches[0..$-1]  // discarding longestFail error message
                             ~ [orErrorString];             // and replacing it by the new, concatenated one.
-        auto children = results[].getUpto(maxFailedLength);
+        _results.length = rules.length;
+        auto children = getUpto(_results, maxFailedLength);
         return ParseTree(name, false, longestFail.matches, p.input, p.end, longestFail.end, children, children.maxFailEnd);
     }
 
@@ -1858,9 +1882,31 @@ template longest_match(rules...) if (rules.length > 0)
         size_t errorStringChars;
         string orErrorString;
 
-        ParseTree[] results = new ParseTree[rules.length];
-        string[] names = new string[rules.length];
-        size_t[] failedLength = new size_t[rules.length];
+        ParseTree[] _results = null;
+        string[] _errorNames = null;
+        size_t[] _failedLength = null;
+
+        ParseTree getResult(size_t ruleIdx) { return ruleIdx < _results.length ? _results[ruleIdx] : ParseTree.init; }
+        void setResult(size_t ruleIdx, ref ParseTree result) {
+            if (result == ParseTree.init) return;
+
+            _results.length = max(_results.length, ruleIdx + 1);
+            _results[ruleIdx] = result;
+        }
+
+        string getErrorName(size_t ruleIdx) { return ruleIdx < _errorNames.length ? _errorNames[ruleIdx] : null; }
+        void setErrorName(size_t ruleIdx, string errorName) {
+            if (errorName is null) return;
+
+            _errorNames.length = max(_errorNames.length, ruleIdx + 1);
+            _errorNames[ruleIdx] = errorName;
+        }
+
+        size_t getFailedLength(size_t ruleIdx) { return ruleIdx < _failedLength.length ? _failedLength[ruleIdx] : size_t.init; }
+        void setFailedLength(size_t ruleIdx, size_t len) {
+            _failedLength.length = max(_failedLength.length, ruleIdx + 1);
+            _failedLength[ruleIdx] = len;
+        }
         size_t maxFailedLength;
 
         version (tracer)
@@ -1892,13 +1938,13 @@ template longest_match(rules...) if (rules.length > 0)
             else
             {
                 enum errName = " (" ~ getName!(r)() ~")";
-                failedLength[i] = temp.end;
+                setFailedLength(i, temp.end);
                 if (temp.end >= longestFail.end)
                 {
                     maxFailedLength = temp.end;
                     longestFail = temp;
-                    names[i] = errName;
-                    results[i] = temp;
+                    setErrorName(i, errName);
+                    setResult(i, temp);
 
                     if (temp.end == longestFail.end)
                         errorStringChars += (temp.matches.length > 0 ? temp.matches[$-1].length : 0) + errName.length + 4;
@@ -1925,8 +1971,8 @@ template longest_match(rules...) if (rules.length > 0)
         string errString;
         errString.reserve(errorStringChars);
         foreach(i; 0..rules.length)
-            if (failedLength[i] == maxFailedLength && results[i].matches.length > 0)
-                errString ~= results[i].matches[$-1] ~ names[i][] ~ " or ";
+            if (getFailedLength(i) == maxFailedLength && getResult(i).matches.length > 0)
+                errString ~= getResult(i).matches[$-1] ~ getErrorName(i)[] ~ " or ";
         orErrorString = errString[0..$ >= 4 ? $-4 : $];
 
         longestFail.matches = longestFail.matches.length == 0 ? [orErrorString] :
